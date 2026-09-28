@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block titre %}Matériel - Catégories{% endblock %}
+
+{% block contenu %}
+<h1>📁 Espèces de matériel</h1>
+<p class="sous-titre">Crée une catégorie (ex: Informatique, Mobilier, Véhicules...) puis ajoute le matériel correspondant à l'intérieur.</p>
+
+<form method="post" action="{{ url_for('ajouter_categorie') }}" class="form-inline">
+    <select name="icone" class="select-icone">
+        <option value="📦">📦 Général</option>
+        <option value="💻">💻 Informatique</option>
+        <option value="🪑">🪑 Mobilier</option>
+        <option value="🚗">🚗 Véhicule</option>
+        <option value="🛠️">🛠️ Outillage</option>
+        <option value="🖨️">🖨️ Bureautique</option>
+        <option value="📱">📱 Électronique</option>
+        <option value="🏗️">🏗️ Chantier</option>
+        <option value="⚡">⚡ Électrique</option>
+        <option value="🧰">🧰 Équipement</option>
+    </select>
+    <input type="text" name="nom" placeholder="Nom de la nouvelle catégorie..." required>
+    <button type="submit">+ Créer la catégorie</button>
+</form>
+
+{% if categories|length == 0 %}
+    <p class="vide">Aucune catégorie créée pour le moment. Commence par en ajouter une ci-dessus.</p>
+{% else %}
+<div class="grille-categories">
+    {% for c in categories %}
+    <div class="carte-categorie">
+        <a href="{{ url_for('materiel_liste', categorie_id=c['id']) }}" class="carte-lien">
+            <div class="icone-categorie">{{ c['icone'] }}</div>
+            <h3>{{ c['nom'] }}</h3>
+            <span class="nb-items">{{ c['nb_items'] }} matériel(s)</span>
+        </a>
+        {% if session.get('role') == 'admin' %}
+        <a href="{{ url_for('supprimer_categorie', id=c['id']) }}"
+           class="btn-supprimer-mini"
+           onclick="return confirm('Supprimer cette catégorie et TOUT son matériel ?');">Supprimer</a>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block titre %}Accueil - Inventaire{% endblock %}
+
+{% block contenu %}
+<h1>Bienvenue 👋</h1>
+<p class="sous-titre">Voici un aperçu de ton inventaire de matériel.</p>
+
+<div class="cartes-stats">
+    <div class="carte-stat">
+        <div class="stat-nombre">{{ nb_categories }}</div>
+        <div class="stat-label">Catégories</div>
+    </div>
+    <div class="carte-stat">
+        <div class="stat-nombre">{{ nb_materiel }}</div>
+        <div class="stat-label">Matériels enregistrés</div>
+    </div>
+</div>
+
+<div class="export-bar">
+    <span>Export global :</span>
+    <a href="{{ url_for('export_global_pdf') }}" class="btn-export btn-pdf">📄 PDF</a>
+    <a href="{{ url_for('export_global_word') }}" class="btn-export btn-word">📝 Word</a>
+    <a href="{{ url_for('export_global_excel') }}" class="btn-export btn-excel">📊 Excel</a>
+</div>
+
+<a href="{{ url_for('materiel_categories') }}" class="btn-ajouter">Voir le matériel</a>
+
+{% if repartition|length > 0 %}
+<h2>Répartition par catégorie</h2>
+<div class="graphique-repartition">
+    {% for r in repartition %}
+    <div class="ligne-barre">
+        <span class="barre-label">{{ r['icone'] }} {{ r['nom'] }}</span>
+        <div class="barre-fond">
+            <div class="barre-remplie" style="width: {{ (r['nb'] / max_nb * 100)|round }}%;"></div>
+        </div>
+        <span class="barre-valeur">{{ r['nb'] }}</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<h2>Derniers matériels ajoutés</h2>
+{% if derniers|length == 0 %}
+    <p class="vide">Aucun matériel enregistré pour le moment.</p>
+{% else %}
+<table>
+    <thead>
+        <tr>
+            <th>Nom</th>
+            <th>Catégorie</th>
+            <th>Code IMMO</th>
+            <th>Statut</th>
+            <th>Responsable</th>
+            <th>Prix</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for m in derniers %}
+        <tr>
+            <td>{{ m['nom'] }}</td>
+            <td>{{ m['categorie_icone'] }} {{ m['categorie_nom'] }}</td>
+            <td><span class="badge-code">{{ m['code_immo'] }}</span></td>
+            <td><span class="badge-statut statut-{{ m['statut']|replace(' ', '-')|replace('/', '-') }}">{{ m['statut'] }}</span></td>
+            <td>{{ m['responsable'] or '-' }}</td>
+            <td>{{ m['prix'] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block titre %}Gestion des utilisateurs{% endblock %}
+
+{% block contenu %}
+<h1>👥 Gestion des utilisateurs</h1>
+<p class="sous-titre">Crée des comptes pour les personnes qui doivent utiliser l'inventaire.</p>
+
+<form method="post" action="{{ url_for('utilisateurs_ajouter') }}" class="form-materiel" style="max-width:400px;">
+    <label>Identifiant</label>
+    <input type="text" name="username" required>
+
+    <label>Mot de passe</label>
+    <input type="password" name="password" required>
+
+    <label>Rôle</label>
+    <select name="role">
+        <option value="user">Utilisateur</option>
+        <option value="admin">Administrateur</option>
+    </select>
+
+    <div class="form-actions">
+        <button type="submit">+ Créer l'utilisateur</button>
+    </div>
+</form>
+
+<h2>Comptes existants</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Identifiant</th>
+            <th>Rôle</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for u in users %}
+        <tr>
+            <td>{{ u['username'] }}</td>
+            <td>
+                {% if u['role'] == 'admin' %}
+                    <span class="badge-admin">Administrateur</span>
+                {% else %}
+                    <span class="badge-user">Utilisateur</span>
+                {% endif %}
+            </td>
+            <td class="actions">
+                {% if u['id'] != session.get('user_id') %}
+                <a href="{{ url_for('utilisateurs_supprimer', id=u['id']) }}"
+                   class="btn-supprimer"
+                   onclick="return confirm('Supprimer cet utilisateur ?');">Supprimer</a>
+                {% else %}
+                    <span class="sous-titre">(toi)</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

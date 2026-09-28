@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block titre %}Modifier un matériel{% endblock %}
+
+{% block contenu %}
+<a href="{{ url_for('materiel_liste', categorie_id=categorie['id']) }}" class="lien-retour">← Retour à {{ categorie['nom'] }}</a>
+<h1>✏️ Modifier — {{ categorie['nom'] }}</h1>
+
+<form method="post" class="form-materiel">
+    <label>Type</label>
+    <input type="text" name="type" value="{{ item['type'] }}">
+
+    <label>Code IMMO <span class="obligatoire">(unique, obligatoire)</span></label>
+    <input type="text" name="code_immo" value="{{ item['code_immo'] }}" required>
+
+    <label>Nom du matériel</label>
+    <input type="text" name="nom" value="{{ item['nom'] }}" required>
+
+    <label>Statut</label>
+    <select name="statut">
+        {% for s in statuts %}
+            <option value="{{ s }}" {% if item['statut'] == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+    </select>
+
+    <label>Responsable / Affecté à</label>
+    <input type="text" name="responsable" value="{{ item['responsable'] or '' }}">
+
+    <label>Prix</label>
+    <input type="number" step="0.01" name="prix" value="{{ item['prix'] }}">
+
+    <label>Projet</label>
+    <input type="text" name="projet" value="{{ item['projet'] }}">
+
+    <label>Fournisseur</label>
+    <input type="text" name="fournisseur" value="{{ item['fournisseur'] or '' }}">
+
+    <label>Date</label>
+    <input type="date" name="date_materiel" value="{{ item['date_materiel'] }}">
+
+    <div class="form-actions">
+        <button type="submit">Mettre à jour</button>
+        <a href="{{ url_for('materiel_liste', categorie_id=categorie['id']) }}" class="btn-annuler">Annuler</a>
+    </div>
+</form>
+{% endblock %}

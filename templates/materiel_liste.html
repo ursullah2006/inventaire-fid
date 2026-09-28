@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block titre %}{{ categorie['nom'] }} - Matériel{% endblock %}
+
+{% block contenu %}
+<a href="{{ url_for('materiel_categories') }}" class="lien-retour">← Retour aux catégories</a>
+<h1>{{ categorie['icone'] }} {{ categorie['nom'] }}</h1>
+
+<div class="top-bar">
+    <form method="get" class="recherche-form">
+        <input type="text" name="recherche" placeholder="Nom, code IMMO, type, responsable..." value="{{ recherche }}">
+        <select name="statut">
+            <option value="">Tous les statuts</option>
+            {% for s in statuts %}
+                <option value="{{ s }}" {% if statut_filtre == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Filtrer</button>
+    </form>
+    <a href="{{ url_for('materiel_ajouter', categorie_id=categorie['id']) }}" class="btn-ajouter">+ Ajouter un matériel</a>
+</div>
+
+<div class="export-bar">
+    <span>Exporter :</span>
+    <a href="{{ url_for('export_pdf', categorie_id=categorie['id']) }}" class="btn-export btn-pdf">📄 PDF</a>
+    <a href="{{ url_for('export_word', categorie_id=categorie['id']) }}" class="btn-export btn-word">📝 Word</a>
+    <a href="{{ url_for('export_excel', categorie_id=categorie['id']) }}" class="btn-export btn-excel">📊 Excel</a>
+</div>
+
+{% if items|length == 0 %}
+    <p class="vide">Aucun matériel trouvé.</p>
+{% else %}
+<div class="table-scroll">
+<table>
+    <thead>
+        <tr>
+            <th>Type</th>
+            <th>Code IMMO</th>
+            <th>Nom</th>
+            <th>Statut</th>
+            <th>Responsable</th>
+            <th>Prix</th>
+            <th>Projet</th>
+            <th>Fournisseur</th>
+            <th>Date</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for m in items %}
+        <tr>
+            <td>{{ m['type'] }}</td>
+            <td><span class="badge-code">{{ m['code_immo'] }}</span></td>
+            <td>{{ m['nom'] }}</td>
+            <td><span class="badge-statut statut-{{ m['statut']|replace(' ', '-')|replace('/', '-') }}">{{ m['statut'] }}</span></td>
+            <td>{{ m['responsable'] or '-' }}</td>
+            <td>{{ m['prix'] }}</td>
+            <td>{{ m['projet'] }}</td>
+            <td>{{ m['fournisseur'] or '-' }}</td>
+            <td>{{ m['date_materiel'] }}</td>
+            <td class="actions">
+                <a href="{{ url_for('materiel_modifier', categorie_id=categorie['id'], id=m['id']) }}" class="btn-modifier">Modifier</a>
+                <a href="{{ url_for('materiel_supprimer', categorie_id=categorie['id'], id=m['id']) }}"
+                   class="btn-supprimer"
+                   onclick="return confirm('Supprimer ce matériel ?');">Supprimer</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}

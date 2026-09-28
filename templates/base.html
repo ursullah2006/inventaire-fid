@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block titre %}Inventaire{% endblock %}</title>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <div class="logo">
+            <img src="{{ url_for('static', filename='logo_fid.png') }}" alt="Logo FID" class="logo-img">
+            <span>Inventaire du matériel</span>
+        </div>
+        {% if session.get('username') %}
+            <a href="{{ url_for('logout') }}" class="lien-deconnexion-top">🚪 Déconnexion</a>
+        {% endif %}
+    </header>
+
+    <div class="layout">
+        <aside class="sidebar">
+            <a href="{{ url_for('accueil') }}" class="{{ 'actif' if request.endpoint == 'accueil' else '' }}">🏠 Accueil</a>
+            <a href="{{ url_for('materiel_categories') }}" class="{{ 'actif' if request.endpoint and request.endpoint.startswith('materiel') else '' }}">📦 Matériel</a>
+            <a href="{{ url_for('scanner') }}" class="{{ 'actif' if request.endpoint and request.endpoint.startswith('scanner') else '' }}">📷 Scanner</a>
+            <a href="{{ url_for('historique') }}" class="{{ 'actif' if request.endpoint == 'historique' else '' }}">🕒 Historique</a>
+            {% if session.get('role') == 'admin' %}
+                <a href="{{ url_for('utilisateurs') }}" class="{{ 'actif' if request.endpoint == 'utilisateurs' else '' }}">👥 Utilisateurs</a>
+            {% endif %}
+
+            <div class="sidebar-separateur"></div>
+
+            <button onclick="toggleTheme()" class="btn-theme-sidebar" id="btn-theme">🌙 Mode sombre</button>
+
+            {% if session.get('username') %}
+                <div class="sidebar-user">👤 {{ session['username'] }}</div>
+            {% endif %}
+        </aside>
+
+        <main class="contenu">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for categorie, message in messages %}
+                        <div class="alerte alerte-{{ categorie }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% block contenu %}{% endblock %}
+        </main>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            var html = document.documentElement;
+            var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            updateThemeIcon();
+        }
+        function updateThemeIcon() {
+            var btn = document.getElementById('btn-theme');
+            if (btn) btn.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️ Mode clair' : '🌙 Mode sombre';
+        }
+        document.addEventListener('DOMContentLoaded', updateThemeIcon);
+    </script>
+</body>
+</html>

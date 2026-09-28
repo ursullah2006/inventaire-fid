@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Connexion - Inventaire</title>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="login-page">
+        <div class="login-carte">
+            <img src="{{ url_for('static', filename='logo_fid.png') }}" alt="Logo FID" class="login-logo">
+            <h1>Connexion</h1>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for categorie, message in messages %}
+                        <div class="alerte alerte-{{ categorie }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form method="post" class="form-materiel">
+                <label>Identifiant</label>
+                <input type="text" name="username" required autofocus>
+
+                <label>Mot de passe</label>
+                <input type="password" name="password" required>
+
+                <div class="form-actions">
+                    <button type="submit">Se connecter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

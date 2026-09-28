@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block titre %}Historique{% endblock %}
+
+{% block contenu %}
+<h1>🕒 Historique des mouvements</h1>
+<p class="sous-titre">Les 300 dernières actions effectuées sur l'inventaire.</p>
+
+{% if logs|length == 0 %}
+    <p class="vide">Aucune action enregistrée pour le moment.</p>
+{% else %}
+<table>
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Action</th>
+            <th>Code IMMO</th>
+            <th>Matériel</th>
+            <th>Détails</th>
+            <th>Utilisateur</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for log in logs %}
+        <tr>
+            <td>{{ log['date_action'] }}</td>
+            <td>
+                {% if log['action'] == 'Ajout' %}
+                    <span class="badge-action badge-ajout">➕ Ajout</span>
+                {% elif log['action'] == 'Modification' %}
+                    <span class="badge-action badge-modif">✏️ Modification</span>
+                {% else %}
+                    <span class="badge-action badge-suppr">🗑️ Suppression</span>
+                {% endif %}
+            </td>
+            <td><span class="badge-code">{{ log['code_immo'] }}</span></td>
+            <td>{{ log['nom_materiel'] }}</td>
+            <td>{{ log['details'] }}</td>
+            <td>{{ log['utilisateur'] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}
