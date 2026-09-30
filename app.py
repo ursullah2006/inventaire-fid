@@ -352,45 +352,6 @@ def accueil():
     )
 
 
-# ---------- SCANNER (code-barres / QR code) ----------
-
-@app.route("/scanner")
-@login_required
-def scanner():
-    conn = get_db_connection()
-    categories = conn.execute("SELECT * FROM categories ORDER BY nom").fetchall()
-    conn.close()
-    return render_template("scanner.html", categories=categories)
-
-
-@app.route("/scanner/verifier")
-@login_required
-def scanner_verifier():
-    code = request.args.get("code", "").strip()
-    categorie_id = request.args.get("categorie_id", type=int)
-
-    if not code:
-        flash("Aucun code reçu.", "erreur")
-        return redirect(url_for("scanner"))
-
-    conn = get_db_connection()
-    existant = conn.execute(
-        "SELECT id, categorie_id, nom FROM materiel WHERE code_immo = ?", (code,)
-    ).fetchone()
-    conn.close()
-
-    if existant:
-        flash(f"Le code '{code}' existe déjà ({existant['nom']}). Voici sa fiche.", "succes")
-        return redirect(url_for("materiel_modifier", categorie_id=existant["categorie_id"], id=existant["id"]))
-
-    if not categorie_id:
-        flash("Choisis d'abord une catégorie pour enregistrer un nouveau matériel.", "erreur")
-        return redirect(url_for("scanner"))
-
-    flash(f"Code '{code}' inconnu : complète la fiche pour l'enregistrer.", "succes")
-    return redirect(url_for("materiel_ajouter", categorie_id=categorie_id, code_immo=code))
-
-
 # ---------- CATEGORIES ----------
 
 @app.route("/materiel")
