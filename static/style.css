@@ -1001,7 +1001,7 @@ tbody tr:hover {
     font-family: inherit;
     font-size: 1em;
 }
-/* ---------- ALERTES (pr?ts, retards, stock 1/6) ---------- */
+/* ---------- ALERTES (prets, retards, stock 1/6) ---------- */
 .bloc-alertes { margin: 14px 0 22px; }
 .bloc-alertes h2 { margin-bottom: 10px; }
 .alerte-retard { border: 1px solid var(--bordure-erreur, #e74c3c); }
@@ -1015,3 +1015,4 @@ tbody tr:hover {
 .btn-valider:hover { background-color: #17542f; }
 .btn-valider-mini { display: inline-block; border-radius: 6px; padding: 6px 10px; background-color: #217346; color: #fff; font-size: 0.9em; }
 .btn-valider-mini:hover { background-color: #17542f; color: #fff; }
+.statut-Prêt { background-color: #dbeafe; color: #1d4ed8; }

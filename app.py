@@ -23,7 +23,7 @@ if USE_PG:
 else:
     DBIntegrityError = sqlite3.IntegrityError
 
-STATUTS = ["En service", "En réparation", "Affecté", "Hors service", "Perdu/volé"]
+STATUTS = ["En service", "En réparation", "Affecté", "Prêt", "Hors service", "Perdu/volé"]
 FUSEAU_MADAGASCAR = timezone(timedelta(hours=3))
 
 # Configuration SMTP pour l'envoi d'emails (à remplir via les variables d'environnement)
@@ -598,6 +598,7 @@ def prets_ajouter():
         INSERT INTO prets (materiel_id, code_immo, nom_materiel, emprunteur, email_emprunteur, date_debut, date_fin, statut)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'En cours')
     """, (materiel_id, materiel["code_immo"], materiel["nom"], emprunteur, email_emprunteur, date_debut, date_fin))
+    conn.execute("UPDATE materiel SET statut = 'Prêt' WHERE id = ?", (materiel_id,))
     conn.commit()
     conn.close()
     log_historique(materiel["id"], materiel["code_immo"], materiel["nom"], "Prêt",
@@ -614,6 +615,7 @@ def prets_rendre(id):
     if pret:
         aujourd_hui = date.today().isoformat()
         conn.execute("UPDATE prets SET statut = 'Rendu', date_retour = ? WHERE id = ?", (aujourd_hui, id))
+        conn.execute("UPDATE materiel SET statut = 'En service' WHERE id = ?", (pret["materiel_id"],))
         conn.commit()
         log_historique(pret["materiel_id"], pret["code_immo"], pret["nom_materiel"], "Retour",
                        f"Retour par {pret['emprunteur']} le {aujourd_hui}")
