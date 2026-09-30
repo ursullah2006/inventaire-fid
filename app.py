@@ -577,7 +577,7 @@ def prets():
 @app.route("/prets/ajouter", methods=["POST"])
 @login_required
 def prets_ajouter():
-    materiel_id = request.form["materiel_id"]
+    code_immo = (request.form.get("code_immo") or request.form.get("materiel_id") or "").strip()
     emprunteur = request.form["emprunteur"].strip()
     email_emprunteur = request.form["email_emprunteur"].strip()
     date_debut = request.form["date_debut"]
@@ -586,19 +586,27 @@ def prets_ajouter():
     if not emprunteur:
         flash("Indique le nom de l'emprunteur.", "erreur")
         return redirect(url_for("prets"))
+    if not code_immo:
+        flash("Indique le code IMMO du matériel.", "erreur")
+        return redirect(url_for("prets"))
 
     conn = get_db_connection()
-    materiel = conn.execute("SELECT * FROM materiel WHERE id = ?", (materiel_id,)).fetchone()
+    if code_immo.isdigit():
+        materiel = conn.execute("SELECT * FROM materiel WHERE id = ?", (code_immo,)).fetchone()
+        if materiel is None:
+            materiel = conn.execute("SELECT * FROM materiel WHERE code_immo = ?", (code_immo,)).fetchone()
+    else:
+        materiel = conn.execute("SELECT * FROM materiel WHERE code_immo = ?", (code_immo,)).fetchone()
     if materiel is None:
         conn.close()
-        flash("Matériel introuvable.", "erreur")
+        flash(f"Aucun matériel trouvé avec le code IMMO '{code_immo}'.", "erreur")
         return redirect(url_for("prets"))
 
     inserer(conn, """
         INSERT INTO prets (materiel_id, code_immo, nom_materiel, emprunteur, email_emprunteur, date_debut, date_fin, statut)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'En cours')
-    """, (materiel_id, materiel["code_immo"], materiel["nom"], emprunteur, email_emprunteur, date_debut, date_fin))
-    conn.execute("UPDATE materiel SET statut = 'Prêt' WHERE id = ?", (materiel_id,))
+    """, (materiel["id"], materiel["code_immo"], materiel["nom"], emprunteur, email_emprunteur, date_debut, date_fin))
+    conn.execute("UPDATE materiel SET statut = 'Prêt' WHERE id = ?", (materiel["id"],))
     conn.commit()
     conn.close()
     log_historique(materiel["id"], materiel["code_immo"], materiel["nom"], "Prêt",
