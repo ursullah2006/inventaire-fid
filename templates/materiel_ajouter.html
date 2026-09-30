@@ -34,6 +34,12 @@
     <label>Fournisseur</label>
     <input type="text" name="fournisseur" value="{{ valeurs.get('fournisseur', '') }}">
 
+    <label>Quantité actuelle</label>
+    <input type="number" min="1" name="quantite" value="{{ valeurs.get('quantite', '1') }}">
+
+    <label>Quantité initiale <span class="obligatoire">(stock de départ pour l'alerte 1/6)</span></label>
+    <input type="number" min="1" name="quantite_initiale" value="{{ valeurs.get('quantite_initiale', '') }}" placeholder="Ex: 50">
+
     <label>Date</label>
     <input type="date" name="date_materiel" value="{{ valeurs.get('date_materiel', '') }}">
 

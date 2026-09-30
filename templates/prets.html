@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block titre %}Prêts de matériel{% endblock %}
+
+{% block contenu %}
+<h1>🤝 Gestion des prêts</h1>
+<p class="sous-titre">Enregistre un matériel prêté, avec la date de début et la date de fin. Une alerte apparaît à la fin du prêt et en cas de retard (avec bouton pour envoyer un email à l'emprunteur).</p>
+
+<h2>➕ Nouveau prêt</h2>
+<form method="post" action="{{ url_for('prets_ajouter') }}" class="form-materiel">
+    <label>Matériel prêté</label>
+    <select name="materiel_id" required>
+        <option value="">— Choisir un matériel —</option>
+        {% for m in materiels %}
+            <option value="{{ m['id'] }}">{{ m['nom'] }} ({{ m['code_immo'] }})</option>
+        {% endfor %}
+    </select>
+
+    <label>Emprunteur</label>
+    <input type="text" name="emprunteur" required placeholder="Nom de la personne">
+
+    <label>Email de l'emprunteur <span class="obligatoire">(pour les rappels)</span></label>
+    <input type="email" name="email_emprunteur" placeholder="exemple@mail.com">
+
+    <label>Date de début</label>
+    <input type="date" name="date_debut" required>
+
+    <label>Date de fin <span class="obligatoire">(date de restitution)</span></label>
+    <input type="date" name="date_fin" required>
+
+    <div class="form-actions">
+        <button type="submit">Enregistrer le prêt</button>
+    </div>
+</form>
+
+{% if prets_retard %}
+<div class="bloc-alertes">
+    <h2>🚨 Prêts en retard</h2>
+    {% for p in prets_retard %}
+    <div class="alerte alerte-erreur alerte-retard">
+        <strong>{{ p['emprunteur'] }}</strong> n'a pas encore rendu
+        <strong>{{ p['nom_materiel'] }}</strong> ({{ p['code_immo'] }})
+        — à rendre depuis le {{ p['date_fin'] }}.
+        <div class="alerte-actions">
+            <form method="get" action="{{ url_for('prets_email', id=p['id']) }}" style="display:inline">
+                <button class="btn-mini btn-email">📧 Envoyer email</button>
+            </form>
+            <form method="get" action="{{ url_for('prets_rendre', id=p['id']) }}" style="display:inline">
+                <button class="btn-mini btn-valider">✅ Marquer rendu</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if prets_aujourdhui %}
+<div class="bloc-alertes">
+    <h2>⏰ Prêts à rendre aujourd'hui</h2>
+    {% for p in prets_aujourdhui %}
+    <div class="alerte alerte-succes">
+        <strong>{{ p['nom_materiel'] }}</strong> prêté à {{ p['emprunteur'] }} — à rendre aujourd'hui ({{ p['date_fin'] }}).
+        <div class="alerte-actions">
+            <form method="get" action="{{ url_for('prets_rendre', id=p['id']) }}" style="display:inline">
+                <button class="btn-mini btn-valider">✅ Marquer rendu</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<h2>Prêts en cours</h2>
+{% if prets_en_cours|length == 0 %}
+    <p class="vide">Aucun prêt en cours.</p>
+{% else %}
+<table>
+    <thead>
+        <tr>
+            <th>Matériel</th>
+            <th>Code</th>
+            <th>Emprunteur</th>
+            <th>Début</th>
+            <th>Fin</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for p in prets_en_cours %}
+        <tr>
+            <td>{{ p['nom_materiel'] }}</td>
+            <td><span class="badge-code">{{ p['code_immo'] }}</span></td>
+            <td>{{ p['emprunteur'] }}</td>
+            <td>{{ p['date_debut'] }}</td>
+            <td>{{ p['date_fin'] }}</td>
+            <td class="td-actions">
+                <a href="{{ url_for('prets_email', id=p['id']) }}" class="btn-modifier">📧 Email</a>
+                <a href="{{ url_for('prets_rendre', id=p['id']) }}" class="btn-valider-mini">✅ Rendu</a>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<h2>Historique des prêts rendus</h2>
+{% if prets_rendus|length == 0 %}
+    <p class="vide">Aucun prêt rendu pour le moment.</p>
+{% else %}
+<table>
+    <thead>
+        <tr>
+            <th>Matériel</th>
+            <th>Emprunteur</th>
+            <th>Début</th>
+            <th>Fin prévue</th>
+            <th>Rendu le</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for p in prets_rendus %}
+        <tr>
+            <td>{{ p['nom_materiel'] }}</td>
+            <td>{{ p['emprunteur'] }}</td>
+            <td>{{ p['date_debut'] }}</td>
+            <td>{{ p['date_fin'] }}</td>
+            <td>{{ p['date_retour'] }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

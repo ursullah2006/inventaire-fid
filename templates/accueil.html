@@ -5,6 +5,45 @@
 <h1>Bienvenue 👋</h1>
 <p class="sous-titre">Voici un aperçu de ton inventaire de matériel.</p>
 
+{% if prets_alertes or stocks %}
+<div class="bloc-alertes">
+    <h2>🔔 Alertes</h2>
+    {% for pret, stats in prets_alertes %}
+        {% if stats['en_retard'] %}
+        <div class="alerte alerte-erreur alerte-retard">
+            <strong>🚨 EN RETARD</strong> — {{ pret['emprunteur'] }} n'a pas encore rendu
+            <strong>{{ pret['nom_materiel'] }}</strong> ({{ pret['code_immo'] }})
+            — prêt à rendre depuis le {{ pret['date_fin'] }}.
+            <div class="alerte-actions">
+                <form method="get" action="{{ url_for('prets_email', id=pret['id']) }}" style="display:inline">
+                    <button class="btn-mini btn-email">📧 Envoyer email</button>
+                </form>
+                <form method="get" action="{{ url_for('prets_rendre', id=pret['id']) }}" style="display:inline">
+                    <button class="btn-mini btn-valider">✅ Marquer rendu</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    {% endfor %}
+    {% for pret, stats in prets_alertes %}
+        {% if stats['aujourdhui'] %}
+        <div class="alerte alerte-succes">
+            <strong>⏰ Prêt à rendre aujourd'hui</strong> — {{ pret['nom_materiel'] }} prêté à
+            {{ pret['emprunteur'] }} se termine ce jour ({{ pret['date_fin'] }}).
+        </div>
+        {% endif %}
+    {% endfor %}
+    {% for s in stocks %}
+    <div class="alerte alerte-erreur alerte-stock">
+        <strong>⚠️ Stock faible (1/6)</strong> — {{ s['nom'] }} ({{ s['code_immo'] }}) :
+        il ne reste que <strong>{{ s['quantite'] }} / {{ s['quantite_initiale'] }}</strong> unités.
+        <a class="alerte-lien" href="{{ url_for('materiel_modifier', categorie_id=s['categorie_id'], id=s['id']) }}">Gérer</a>
+    </div>
+    {% endfor %}
+    <a href="{{ url_for('prets') }}" class="alerte-lien">Voir tous les prêts →</a>
+</div>
+{% endif %}
+
 <div class="cartes-stats">
     <div class="carte-stat">
         <div class="stat-nombre">{{ nb_categories }}</div>

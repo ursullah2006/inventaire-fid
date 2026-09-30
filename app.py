@@ -1,7 +1,9 @@
 import os
 import io
 import sqlite3
-from datetime import datetime, timedelta, timezone
+import smtplib
+from email.message import EmailMessage
+from datetime import datetime, timedelta, timezone, date
 from functools import wraps
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file
@@ -23,6 +25,14 @@ else:
 
 STATUTS = ["En service", "En réparation", "Affecté", "Hors service", "Perdu/volé"]
 FUSEAU_MADAGASCAR = timezone(timedelta(hours=3))
+
+# Configuration SMTP pour l'envoi d'emails (à remplir via les variables d'environnement)
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASS = os.environ.get("SMTP_PASS", "")
+EMAIL_FROM = os.environ.get("EMAIL_FROM", SMTP_USER)
+SMTP_ACTIF = bool(SMTP_HOST and SMTP_USER and SMTP_PASS)
 
 
 class PGConnection:
@@ -112,6 +122,26 @@ def init_db():
             date_action TEXT
         )
     """)
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS prets (
+            id {cle},
+            materiel_id INTEGER,
+            code_immo TEXT,
+            nom_materiel TEXT,
+            emprunteur TEXT NOT NULL,
+            email_emprunteur TEXT,
+            date_debut TEXT,
+            date_fin TEXT,
+            date_retour TEXT,
+            statut TEXT DEFAULT 'En cours'
+        )
+    """)
+
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(materiel)").fetchall()]
+    if "quantite" not in cols:
+        conn.execute("ALTER TABLE materiel ADD COLUMN quantite INTEGER DEFAULT 1")
+    if "quantite_initiale" not in cols:
+        conn.execute("ALTER TABLE materiel ADD COLUMN quantite_initiale INTEGER DEFAULT 1")
 
     nb_users = conn.execute("SELECT COUNT(*) AS total FROM users").fetchone()["total"]
     if nb_users == 0:
@@ -134,6 +164,58 @@ def log_historique(materiel_id, code_immo, nom_materiel, action, details=""):
           session.get("username", "?"), maintenant))
     conn.commit()
     conn.close()
+
+
+def envoyer_email(adresse, sujet, corps):
+    """Envoie un email et renvoie (ok, message)."""
+    if not SMTP_ACTIF:
+        return False, "Email non configuré. Renseigne les variables SMTP_HOST, SMTP_USER, SMTP_PASS."
+    if not adresse:
+        return False, "Aucune adresse email enregistrée pour cette personne."
+    try:
+        msg = EmailMessage()
+        msg["From"] = EMAIL_FROM
+        msg["To"] = adresse
+        msg["Subject"] = sujet
+        msg.set_content(corps)
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as serveur:
+            serveur.ehlo()
+            if serveur.has_extn("starttls"):
+                serveur.starttls()
+                serveur.ehlo()
+            serveur.login(SMTP_USER, SMTP_PASS)
+            serveur.send_message(msg)
+        return True, f"Email envoyé à {adresse}."
+    except Exception as e:
+        return False, f"Erreur lors de l'envoi de l'email : {e}"
+
+
+def prets_en_cours():
+    """Tous les prêts non rendus, enrichis du statut retard/aujourd'hui."""
+    conn = get_db_connection()
+    prets = conn.execute("SELECT * FROM prets WHERE statut != 'Rendu' ORDER BY date_fin").fetchall()
+    conn.close()
+    aujourd_hui = date.today()
+    resultats = []
+    for p in prets:
+        fin = datetime.strptime(p["date_fin"], "%Y-%m-%d").date() if p["date_fin"] else None
+        stats = {"en_retard": bool(fin and fin < aujourd_hui),
+                 "aujourdhui": bool(fin and fin == aujourd_hui)}
+        resultats.append((p, stats))
+    return resultats
+
+
+def alertes_stock():
+    """Matériels dont il ne reste qu'1/6 du stock initial."""
+    conn = get_db_connection()
+    items = conn.execute("""
+        SELECT * FROM materiel
+        WHERE quantite > 0 AND quantite_initiale > 0
+          AND quantite <= (quantite_initiale / 6)
+        ORDER BY quantite ASC
+    """).fetchall()
+    conn.close()
+    return items
 
 
 def login_required(f):
@@ -259,9 +341,14 @@ def accueil():
         ORDER BY materiel.id DESC LIMIT 5
     """).fetchall()
     conn.close()
+
+    prets_alertes = prets_en_cours()
+    stocks = alertes_stock()
+
     return render_template(
         "accueil.html", nb_categories=nb_categories, nb_materiel=nb_materiel,
-        repartition=repartition, max_nb=max_nb, derniers=derniers
+        repartition=repartition, max_nb=max_nb, derniers=derniers,
+        prets_alertes=prets_alertes, stocks=stocks
     )
 
 
@@ -404,12 +491,14 @@ def materiel_ajouter(categorie_id):
         statut = request.form.get("statut", "En service")
         responsable = request.form.get("responsable", "")
         fournisseur = request.form.get("fournisseur", "")
+        quantite = int(request.form.get("quantite", 1) or 1)
+        quantite_initiale = int(request.form.get("quantite_initiale", quantite) or quantite)
 
         try:
             nouveau_id = inserer(conn, """
-                INSERT INTO materiel (categorie_id, type, code_immo, prix, projet, nom, date_materiel, statut, responsable, fournisseur)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (categorie_id, type_, code_immo, prix, projet, nom, date_materiel, statut, responsable, fournisseur))
+                INSERT INTO materiel (categorie_id, type, code_immo, prix, projet, nom, date_materiel, statut, responsable, fournisseur, quantite, quantite_initiale)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (categorie_id, type_, code_immo, prix, projet, nom, date_materiel, statut, responsable, fournisseur, quantite, quantite_initiale))
             conn.commit()
             conn.close()
             log_historique(nouveau_id, code_immo, nom, "Ajout", f"Matériel ajouté dans '{categorie['nom']}'")
@@ -441,13 +530,15 @@ def materiel_modifier(categorie_id, id):
         statut = request.form.get("statut", "En service")
         responsable = request.form.get("responsable", "")
         fournisseur = request.form.get("fournisseur", "")
+        quantite = int(request.form.get("quantite", 1) or 1)
+        quantite_initiale = int(request.form.get("quantite_initiale", quantite) or quantite)
 
         try:
             conn.execute("""
                 UPDATE materiel
-                SET type=?, code_immo=?, prix=?, projet=?, nom=?, date_materiel=?, statut=?, responsable=?, fournisseur=?
+                SET type=?, code_immo=?, prix=?, projet=?, nom=?, date_materiel=?, statut=?, responsable=?, fournisseur=?, quantite=?, quantite_initiale=?
                 WHERE id=?
-            """, (type_, code_immo, prix, projet, nom, date_materiel, statut, responsable, fournisseur, id))
+            """, (type_, code_immo, prix, projet, nom, date_materiel, statut, responsable, fournisseur, quantite, quantite_initiale, id))
             conn.commit()
             conn.close()
             log_historique(id, code_immo, nom, "Modification", f"Statut: {statut}, Responsable: {responsable or '-'}")
@@ -487,6 +578,122 @@ def historique():
     logs = conn.execute("SELECT * FROM historique ORDER BY id DESC LIMIT 300").fetchall()
     conn.close()
     return render_template("historique.html", logs=logs)
+
+
+# ---------- GESTION DES PRETS ----------
+
+@app.route("/prets")
+@login_required
+def prets():
+    conn = get_db_connection()
+    materiels = conn.execute("SELECT id, code_immo, nom FROM materiel ORDER BY nom").fetchall()
+    prets = conn.execute("SELECT * FROM prets ORDER BY date_fin DESC, id DESC").fetchall()
+    conn.close()
+
+    prets_retard = []
+    prets_aujourdhui = []
+    prets_en_cours_liste = []
+    prets_rendus = []
+    aujourd_hui = date.today()
+    for p in prets:
+        fin = datetime.strptime(p["date_fin"], "%Y-%m-%d").date() if p["date_fin"] else None
+        if p["statut"] == "Rendu":
+            prets_rendus.append(p)
+        else:
+            prets_en_cours_liste.append(p)
+            if fin and fin < aujourd_hui:
+                prets_retard.append(p)
+            if fin and fin == aujourd_hui:
+                prets_aujourdhui.append(p)
+
+    return render_template(
+        "prets.html", materiels=materiels, prets_en_cours=prets_en_cours_liste,
+        prets_rendus=prets_rendus, prets_retard=prets_retard,
+        prets_aujourdhui=prets_aujourdhui
+    )
+
+
+@app.route("/prets/ajouter", methods=["POST"])
+@login_required
+def prets_ajouter():
+    materiel_id = request.form["materiel_id"]
+    emprunteur = request.form["emprunteur"].strip()
+    email_emprunteur = request.form["email_emprunteur"].strip()
+    date_debut = request.form["date_debut"]
+    date_fin = request.form["date_fin"]
+
+    if not emprunteur:
+        flash("Indique le nom de l'emprunteur.", "erreur")
+        return redirect(url_for("prets"))
+
+    conn = get_db_connection()
+    materiel = conn.execute("SELECT * FROM materiel WHERE id = ?", (materiel_id,)).fetchone()
+    if materiel is None:
+        conn.close()
+        flash("Matériel introuvable.", "erreur")
+        return redirect(url_for("prets"))
+
+    inserer(conn, """
+        INSERT INTO prets (materiel_id, code_immo, nom_materiel, emprunteur, email_emprunteur, date_debut, date_fin, statut)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'En cours')
+    """, (materiel_id, materiel["code_immo"], materiel["nom"], emprunteur, email_emprunteur, date_debut, date_fin))
+    conn.commit()
+    conn.close()
+    log_historique(materiel["id"], materiel["code_immo"], materiel["nom"], "Prêt",
+                   f"Prêté à {emprunteur} du {date_debut} au {date_fin}")
+    flash(f"Prêt enregistré : {materiel['nom']} → {emprunteur} jusqu'au {date_fin}.", "succes")
+    return redirect(url_for("prets"))
+
+
+@app.route("/prets/rendre/<int:id>")
+@login_required
+def prets_rendre(id):
+    conn = get_db_connection()
+    pret = conn.execute("SELECT * FROM prets WHERE id = ?", (id,)).fetchone()
+    if pret:
+        aujourd_hui = date.today().isoformat()
+        conn.execute("UPDATE prets SET statut = 'Rendu', date_retour = ? WHERE id = ?", (aujourd_hui, id))
+        conn.commit()
+        log_historique(pret["materiel_id"], pret["code_immo"], pret["nom_materiel"], "Retour",
+                       f"Retour par {pret['emprunteur']} le {aujourd_hui}")
+        flash(f"Retour enregistré pour {pret['nom_materiel']} ({pret['emprunteur']}).", "succes")
+        en_retard = (pret["date_fin"] and pret["date_fin"] < aujourd_hui)
+        if pret["email_emprunteur"] and en_retard:
+            ok, m = envoyer_email(
+                pret["email_emprunteur"],
+                f"Retour enregistré - {pret['nom_materiel']}",
+                f"Bonjour {pret['emprunteur']},\n\nLe matériel {pret['nom_materiel']} "
+                f"(code {pret['code_immo']}) a bien été rendu le {aujourd_hui}.\nMerci."
+            )
+            flash(m, "succes" if ok else "erreur")
+    conn.close()
+    return redirect(url_for("prets"))
+
+
+@app.route("/prets/email/<int:id>")
+@login_required
+def prets_email(id):
+    conn = get_db_connection()
+    pret = conn.execute("SELECT * FROM prets WHERE id = ?", (id,)).fetchone()
+    conn.close()
+    if not pret:
+        flash("Prêt introuvable.", "erreur")
+        return redirect(url_for("prets"))
+
+    if pret["statut"] == "Rendu":
+        sujet = f"Reçu pour la restitution - {pret['nom_materiel']}"
+        corps = (f"Bonjour {pret['emprunteur']},\n\n"
+                 f"Ceci est une confirmation : le matériel {pret['nom_materiel']} "
+                 f"(code {pret['code_immo']}) a été rendu le {pret['date_retour']}.\n")
+    else:
+        sujet = f"Rappel : rendre {pret['nom_materiel']}"
+        corps = (f"Bonjour {pret['emprunteur']},\n\n"
+                 f"Tu as emprunté le matériel : {pret['nom_materiel']} (code {pret['code_immo']}).\n"
+                 f"Date de début : {pret['date_debut']}\nDate de fin prévue : {pret['date_fin']}\n\n"
+                 f"Si le délai est dépassé, merci de le rendre dès que possible.\nMerci.")
+    ok, m = envoyer_email(pret["email_emprunteur"], sujet, corps)
+    flash(m, "succes" if ok else "erreur")
+    return redirect(url_for("prets"))
 
 
 # ---------- EXPORTS PAR CATEGORIE ----------
