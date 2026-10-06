@@ -549,18 +549,6 @@ def materiel_supprimer(categorie_id, id):
     return redirect(url_for("materiel_liste", categorie_id=categorie_id))
 
 
-# ---------- SCANNER DE CODES ----------
-@app.route("/scanner")
-@login_required
-def scanner():
-    conn = get_db_connection()
-    materiels = conn.execute(
-        "SELECT id, code_immo, nom, categorie_id FROM materiel ORDER BY nom"
-    ).fetchall()
-    conn.close()
-    return render_template("scanner.html", materiels=materiels)
-
-
 # ---------- HISTORIQUE ----------
 
 @app.route("/historique")
