@@ -664,6 +664,34 @@ tbody tr:hover {
 .statut-Hors-service { background-color: #e5e7eb; color: #4b5563; }
 .statut-Perdu-volé { background-color: #fbdada; color: #c0392b; }
 
+/* ---------- BADGES ETAT MATERIEL ---------- */
+
+.badge-etat {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 700;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+.etat-Bon { background-color: #d4f5dd; color: #1e7e34; }
+.etat-Moyen { background-color: #fff3d6; color: #a67c00; }
+.etat-Mauvais { background-color: #fbdada; color: #c0392b; }
+
+/* ---------- AFFICHAGE MATERIEL TROUVE (pret) ---------- */
+
+.materiel-trouve {
+    margin-top: 8px;
+    font-weight: 600;
+    font-size: 0.95em;
+    min-height: 1.2em;
+}
+
+.materiel-trouve-ok { color: #1e7e34; }
+.materiel-trouve-info { color: #a67c00; }
+.materiel-trouve-erreur { color: #c0392b; }
+
 /* ---------- BADGES ACTION (historique) ---------- */
 
 .badge-action {

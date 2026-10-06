@@ -24,6 +24,7 @@ else:
     DBIntegrityError = sqlite3.IntegrityError
 
 STATUTS = ["En service", "En réparation", "Affecté", "Prêt", "Hors service", "Perdu/volé"]
+ETATS = ["Bon", "Moyen", "Mauvais"]
 FUSEAU_MADAGASCAR = timezone(timedelta(hours=3))
 
 # Configuration SMTP pour l'envoi d'emails (à remplir via les variables d'environnement)
@@ -142,6 +143,8 @@ def init_db():
         conn.execute("ALTER TABLE materiel ADD COLUMN quantite INTEGER DEFAULT 1")
     if "quantite_initiale" not in cols:
         conn.execute("ALTER TABLE materiel ADD COLUMN quantite_initiale INTEGER DEFAULT 1")
+    if "etat" not in cols:
+        conn.execute("ALTER TABLE materiel ADD COLUMN etat TEXT DEFAULT 'Bon'")
 
     nb_users = conn.execute("SELECT COUNT(*) AS total FROM users").fetchone()["total"]
     if nb_users == 0:
@@ -213,6 +216,19 @@ def alertes_stock():
         WHERE quantite > 0 AND quantite_initiale > 0
           AND quantite <= (quantite_initiale / 6)
         ORDER BY quantite ASC
+    """).fetchall()
+    conn.close()
+    return items
+
+
+def materiels_a_remplacer():
+    """Matériels en mauvais état de fonctionnement (à réparer ou remplacer)."""
+    conn = get_db_connection()
+    items = conn.execute("""
+        SELECT materiel.*, categories.nom AS categorie_nom
+        FROM materiel JOIN categories ON materiel.categorie_id = categories.id
+        WHERE materiel.etat = 'Mauvais'
+        ORDER BY materiel.nom
     """).fetchall()
     conn.close()
     return items
@@ -344,11 +360,12 @@ def accueil():
 
     prets_alertes = prets_en_cours()
     stocks = alertes_stock()
+    mauvais = materiels_a_remplacer()
 
     return render_template(
         "accueil.html", nb_categories=nb_categories, nb_materiel=nb_materiel,
         repartition=repartition, max_nb=max_nb, derniers=derniers,
-        prets_alertes=prets_alertes, stocks=stocks
+        prets_alertes=prets_alertes, stocks=stocks, mauvais=mauvais
     )
 
 
@@ -450,6 +467,7 @@ def materiel_ajouter(categorie_id):
         nom = request.form["nom"]
         date_materiel = request.form["date_materiel"]
         statut = request.form.get("statut", "En service")
+        etat = request.form.get("etat", "Bon")
         responsable = request.form.get("responsable", "")
         fournisseur = request.form.get("fournisseur", "")
         quantite = int(request.form.get("quantite", 1) or 1)
@@ -457,9 +475,9 @@ def materiel_ajouter(categorie_id):
 
         try:
             nouveau_id = inserer(conn, """
-                INSERT INTO materiel (categorie_id, type, code_immo, prix, projet, nom, date_materiel, statut, responsable, fournisseur, quantite, quantite_initiale)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (categorie_id, type_, code_immo, prix, projet, nom, date_materiel, statut, responsable, fournisseur, quantite, quantite_initiale))
+                INSERT INTO materiel (categorie_id, type, code_immo, prix, projet, nom, date_materiel, statut, etat, responsable, fournisseur, quantite, quantite_initiale)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (categorie_id, type_, code_immo, prix, projet, nom, date_materiel, statut, etat, responsable, fournisseur, quantite, quantite_initiale))
             conn.commit()
             conn.close()
             log_historique(nouveau_id, code_immo, nom, "Ajout", f"Matériel ajouté dans '{categorie['nom']}'")
@@ -468,11 +486,11 @@ def materiel_ajouter(categorie_id):
         except DBIntegrityError:
             conn.close()
             flash(f"Le code IMMO '{code_immo}' existe déjà. Chaque matériel doit avoir un code IMMO unique.", "erreur")
-            return render_template("materiel_ajouter.html", categorie=categorie, valeurs=request.form, statuts=STATUTS)
+            return render_template("materiel_ajouter.html", categorie=categorie, valeurs=request.form, statuts=STATUTS, etats=ETATS)
 
     conn.close()
     valeurs = {"code_immo": request.args.get("code_immo", "")}
-    return render_template("materiel_ajouter.html", categorie=categorie, valeurs=valeurs, statuts=STATUTS)
+    return render_template("materiel_ajouter.html", categorie=categorie, valeurs=valeurs, statuts=STATUTS, etats=ETATS)
 
 
 @app.route("/materiel/<int:categorie_id>/modifier/<int:id>", methods=["GET", "POST"])
@@ -489,6 +507,7 @@ def materiel_modifier(categorie_id, id):
         nom = request.form["nom"]
         date_materiel = request.form["date_materiel"]
         statut = request.form.get("statut", "En service")
+        etat = request.form.get("etat", "Bon")
         responsable = request.form.get("responsable", "")
         fournisseur = request.form.get("fournisseur", "")
         quantite = int(request.form.get("quantite", 1) or 1)
@@ -497,23 +516,23 @@ def materiel_modifier(categorie_id, id):
         try:
             conn.execute("""
                 UPDATE materiel
-                SET type=?, code_immo=?, prix=?, projet=?, nom=?, date_materiel=?, statut=?, responsable=?, fournisseur=?, quantite=?, quantite_initiale=?
+                SET type=?, code_immo=?, prix=?, projet=?, nom=?, date_materiel=?, statut=?, etat=?, responsable=?, fournisseur=?, quantite=?, quantite_initiale=?
                 WHERE id=?
-            """, (type_, code_immo, prix, projet, nom, date_materiel, statut, responsable, fournisseur, quantite, quantite_initiale, id))
+            """, (type_, code_immo, prix, projet, nom, date_materiel, statut, etat, responsable, fournisseur, quantite, quantite_initiale, id))
             conn.commit()
             conn.close()
-            log_historique(id, code_immo, nom, "Modification", f"Statut: {statut}, Responsable: {responsable or '-'}")
+            log_historique(id, code_immo, nom, "Modification", f"Statut: {statut}, État: {etat}, Responsable: {responsable or '-'}")
             flash("Matériel mis à jour.", "succes")
             return redirect(url_for("materiel_liste", categorie_id=categorie_id))
         except DBIntegrityError:
             item = conn.execute("SELECT * FROM materiel WHERE id = ?", (id,)).fetchone()
             conn.close()
             flash(f"Le code IMMO '{code_immo}' est déjà utilisé par un autre matériel.", "erreur")
-            return render_template("materiel_modifier.html", categorie=categorie, item=item, statuts=STATUTS)
+            return render_template("materiel_modifier.html", categorie=categorie, item=item, statuts=STATUTS, etats=ETATS)
 
     item = conn.execute("SELECT * FROM materiel WHERE id = ?", (id,)).fetchone()
     conn.close()
-    return render_template("materiel_modifier.html", categorie=categorie, item=item, statuts=STATUTS)
+    return render_template("materiel_modifier.html", categorie=categorie, item=item, statuts=STATUTS, etats=ETATS)
 
 
 @app.route("/materiel/<int:categorie_id>/supprimer/<int:id>")
@@ -528,6 +547,18 @@ def materiel_supprimer(categorie_id, id):
         log_historique(None, item["code_immo"], item["nom"], "Suppression", "Matériel supprimé de l'inventaire")
     flash("Matériel supprimé.", "succes")
     return redirect(url_for("materiel_liste", categorie_id=categorie_id))
+
+
+# ---------- SCANNER DE CODES ----------
+@app.route("/scanner")
+@login_required
+def scanner():
+    conn = get_db_connection()
+    materiels = conn.execute(
+        "SELECT id, code_immo, nom, categorie_id FROM materiel ORDER BY nom"
+    ).fetchall()
+    conn.close()
+    return render_template("scanner.html", materiels=materiels)
 
 
 # ---------- HISTORIQUE ----------
@@ -591,15 +622,28 @@ def prets_ajouter():
         return redirect(url_for("prets"))
 
     conn = get_db_connection()
+    materiel = None
     if code_immo.isdigit():
         materiel = conn.execute("SELECT * FROM materiel WHERE id = ?", (code_immo,)).fetchone()
-        if materiel is None:
-            materiel = conn.execute("SELECT * FROM materiel WHERE code_immo = ?", (code_immo,)).fetchone()
-    else:
+    if materiel is None:
         materiel = conn.execute("SELECT * FROM materiel WHERE code_immo = ?", (code_immo,)).fetchone()
     if materiel is None:
+        materiel = conn.execute("SELECT * FROM materiel WHERE nom = ? COLLATE NOCASE", (code_immo,)).fetchone()
+    if materiel is None:
+        candidats = conn.execute(
+            "SELECT * FROM materiel WHERE nom LIKE ? COLLATE NOCASE ORDER BY nom LIMIT 10",
+            (f"%{code_immo}%",)
+        ).fetchall()
+        if len(candidats) == 1:
+            materiel = candidats[0]
+        elif len(candidats) > 1:
+            noms = " ; ".join(c["nom"] + " (" + c["code_immo"] + ")" for c in candidats[:5])
+            conn.close()
+            flash(f"Plusieurs matériels correspondent à '{code_immo}' : {noms}. Tape le nom complet ou le code IMMO.", "erreur")
+            return redirect(url_for("prets"))
+    if materiel is None:
         conn.close()
-        flash(f"Aucun matériel trouvé avec le code IMMO '{code_immo}'.", "erreur")
+        flash(f"Aucun matériel trouvé avec '{code_immo}'. Vérifie le code IMMO ou le nom du matériel.", "erreur")
         return redirect(url_for("prets"))
 
     inserer(conn, """
@@ -690,7 +734,7 @@ def get_tout_le_materiel():
     return items
 
 
-COLONNES_EXPORT = ["Catégorie", "Type", "Code IMMO", "Nom", "Prix", "Projet", "Statut", "Responsable", "Fournisseur", "Date"]
+COLONNES_EXPORT = ["Catégorie", "Type", "Code IMMO", "Nom", "Prix", "Projet", "Statut", "État", "Responsable", "Fournisseur", "Date"]
 
 
 def ligne_export(m, avec_categorie=False):
@@ -698,7 +742,7 @@ def ligne_export(m, avec_categorie=False):
     if avec_categorie:
         ligne.append(m["categorie_nom"])
     ligne += [m["type"] or "", m["code_immo"], m["nom"], str(m["prix"] or ""), m["projet"] or "",
-              m["statut"] or "", m["responsable"] or "", m["fournisseur"] or "", m["date_materiel"] or ""]
+              m["statut"] or "", m["etat"] or "Bon", m["responsable"] or "", m["fournisseur"] or "", m["date_materiel"] or ""]
     return ligne
 
 

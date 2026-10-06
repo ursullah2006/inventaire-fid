@@ -5,7 +5,7 @@
 <h1>Bienvenue 👋</h1>
 <p class="sous-titre">Voici un aperçu de ton inventaire de matériel.</p>
 
-{% if prets_alertes or stocks %}
+{% if prets_alertes or stocks or mauvais %}
 <div class="bloc-alertes">
     <h2>🔔 Alertes</h2>
     {% for pret, stats in prets_alertes %}
@@ -36,8 +36,17 @@
     {% for s in stocks %}
     <div class="alerte alerte-erreur alerte-stock">
         <strong>⚠️ Stock faible (1/6)</strong> — {{ s['nom'] }} ({{ s['code_immo'] }}) :
-        il ne reste que <strong>{{ s['quantite'] }} / {{ s['quantite_initiale'] }}</strong> unités.
+        il ne reste que <strong>{{ s['quantite'] }} / {{ s['quantite_initiale'] }}</strong> unités
+        (état : {{ s['etat'] or 'Bon' }}).
+        {% if s['etat'] == 'Mauvais' %}<strong>— réparer ou remplacer !</strong>{% endif %}
         <a class="alerte-lien" href="{{ url_for('materiel_modifier', categorie_id=s['categorie_id'], id=s['id']) }}">Gérer</a>
+    </div>
+    {% endfor %}
+    {% for m in mauvais %}
+    <div class="alerte alerte-erreur">
+        <strong>MATÉRIEL EN MAUVAIS ÉTAT</strong> — {{ m['nom'] }} ({{ m['code_immo'] }}) :
+        {{ m['quantite'] }} unité(s) en état mauvais. Prévoir une réparation ou un remplacement.
+        <a class="alerte-lien" href="{{ url_for('materiel_modifier', categorie_id=m['categorie_id'], id=m['id']) }}">Gérer</a>
     </div>
     {% endfor %}
     <a href="{{ url_for('prets') }}" class="alerte-lien">Voir tous les prêts →</a>
