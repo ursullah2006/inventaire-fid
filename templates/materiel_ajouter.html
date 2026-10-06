@@ -22,6 +22,13 @@
         {% endfor %}
     </select>
 
+    <label>État du matériel <span class="obligatoire">(état de fonctionnement : Bon, Moyen ou Mauvais)</span></label>
+    <select name="etat">
+        {% for e in etats %}
+            <option value="{{ e }}" {% if valeurs.get('etat') == e %}selected{% endif %}>{{ e }}</option>
+        {% endfor %}
+    </select>
+
     <label>Responsable / Affecté à</label>
     <input type="text" name="responsable" value="{{ valeurs.get('responsable', '') }}" placeholder="Nom de la personne ou du service">
 

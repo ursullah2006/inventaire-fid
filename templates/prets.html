@@ -7,16 +7,16 @@
 
 <h2>➕ Nouveau prêt</h2>
 <form method="post" action="{{ url_for('prets_ajouter') }}" class="form-materiel">
-    <label>Code IMMO du matériel <span class="obligatoire">(tape le code, l'auto-complétion propose les matériels)</span></label>
-    <input type="text" name="code_immo" list="liste-materiels" required
-           placeholder="Ex: IMMO-0001"
-           autocomplete="off"
-           oninput="var o=document.getElementById('liste-materiels').querySelector('option[value=\"'+this.value+'\"]'); if(o){this.setAttribute('data-nom',o.getAttribute('data-nom'));}">
+    <label>Matériel : code IMMO ou nom <span class="obligatoire">(tape le code — le nom s'affiche — ou tape directement le nom)</span></label>
+    <input type="text" name="code_immo" id="champ-materiel" list="liste-materiels" required
+           placeholder="Ex: IMMO-0001 ou Ordinateur portable"
+           autocomplete="off">
     <datalist id="liste-materiels">
         {% for m in materiels %}
             <option value="{{ m['code_immo'] }}" data-nom="{{ m['nom'] }}">{{ m['nom'] }}</option>
         {% endfor %}
     </datalist>
+    <div class="materiel-trouve" id="materiel-trouve"></div>
 
     <label>Emprunteur</label>
     <input type="text" name="emprunteur" required placeholder="Nom de la personne">
@@ -132,4 +132,42 @@
     </tbody>
 </table>
 {% endif %}
+
+<script>
+    var MATERIELS = [
+        {% for m in materiels %}
+            {code: {{ m['code_immo']|tojson }}, nom: {{ m['nom']|tojson }}, id: {{ m['id'] }}},
+        {% endfor %}
+    ];
+    function norme(v) { return (v || "").toLowerCase().trim(); }
+    function majMaterielTrouve() {
+        var champ = document.getElementById('champ-materiel');
+        var sortie = document.getElementById('materiel-trouve');
+        if (!champ || !sortie) return;
+        var saisie = norme(champ.value);
+        if (!saisie) { sortie.textContent = ''; sortie.className = 'materiel-trouve'; return; }
+        for (var i = 0; i < MATERIELS.length; i++) {
+            var m = MATERIELS[i];
+            if (norme(m.code) === saisie || norme(m.nom) === saisie) {
+                sortie.innerHTML = '&#10003; ' + m.nom + ' <span class="badge-code">' + m.code + '</span>';
+                sortie.className = 'materiel-trouve materiel-trouve-ok';
+                return;
+            }
+        }
+        var correspondances = 0;
+        for (var j = 0; j < MATERIELS.length; j++) {
+            var mj = MATERIELS[j];
+            if (norme(mj.nom).indexOf(saisie) !== -1 || norme(mj.code).indexOf(saisie) !== -1) correspondances++;
+        }
+        if (correspondances > 0) {
+            sortie.textContent = correspondances + ' matériel(s) correspondent — choisis dans la liste déroulante.';
+            sortie.className = 'materiel-trouve materiel-trouve-info';
+        } else {
+            sortie.textContent = 'Aucun matériel ne correspond à ce code ou ce nom.';
+            sortie.className = 'materiel-trouve materiel-trouve-erreur';
+        }
+    }
+    document.getElementById('champ-materiel').addEventListener('input', majMaterielTrouve);
+    majMaterielTrouve();
+</script>
 {% endblock %}

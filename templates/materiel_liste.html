@@ -37,6 +37,7 @@
             <th>Code IMMO</th>
             <th>Nom</th>
             <th>Statut</th>
+            <th>État</th>
             <th>Responsable</th>
             <th>Prix</th>
             <th>Projet</th>
@@ -52,6 +53,7 @@
             <td><span class="badge-code">{{ m['code_immo'] }}</span></td>
             <td>{{ m['nom'] }}</td>
             <td><span class="badge-statut statut-{{ m['statut']|replace(' ', '-')|replace('/', '-') }}">{{ m['statut'] }}</span></td>
+            <td><span class="badge-etat etat-{{ m['etat'] or 'Bon' }}">{{ m['etat'] or 'Bon' }}</span></td>
             <td>{{ m['responsable'] or '-' }}</td>
             <td>{{ m['prix'] }}</td>
             <td>{{ m['projet'] }}</td>
